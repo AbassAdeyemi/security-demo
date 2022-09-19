@@ -1,0 +1,47 @@
+import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.codec.digest.DigestUtils;
+import org.apache.commons.lang3.ArrayUtils;
+
+import javax.crypto.BadPaddingException;
+import javax.crypto.Cipher;
+import javax.crypto.IllegalBlockSizeException;
+import javax.crypto.NoSuchPaddingException;
+import javax.crypto.spec.IvParameterSpec;
+import javax.crypto.spec.SecretKeySpec;
+import java.nio.charset.StandardCharsets;
+import java.security.InvalidAlgorithmParameterException;
+import java.security.InvalidKeyException;
+import java.security.NoSuchAlgorithmException;
+import java.security.spec.InvalidKeySpecException;
+import java.util.Base64;
+import java.util.HexFormat;
+import java.util.stream.IntStream;
+
+@Slf4j
+public class SecurityUtils {
+
+    public static void main(String[] args) throws NoSuchPaddingException, IllegalBlockSizeException, NoSuchAlgorithmException, BadPaddingException, InvalidKeySpecException, InvalidKeyException, InvalidAlgorithmParameterException {
+        decryptString("714ac730a2eaafb14528f726f21637178d5a09480c1223d66536cd6078b98baab1f9c2efa763797bd00cd04611de62d0"
+                , "test_sk_7JLVA0RNWbOcMVJzzxx0");
+    }
+    public static void decryptString(String encryptedData, String secretKey) throws NoSuchPaddingException,
+            NoSuchAlgorithmException, IllegalBlockSizeException, BadPaddingException, InvalidKeyException, InvalidAlgorithmParameterException {
+        var encryptedDataBuffer = HexFormat.of().parseHex(encryptedData);
+        Byte[] boxedIv = IntStream.range(0, 16)
+                .mapToObj(i -> encryptedDataBuffer[i])
+                .toArray(Byte[]::new);
+        byte[] iv = ArrayUtils.toPrimitive(boxedIv);
+        Byte[] boxedEncryptedText = IntStream.range(16, encryptedDataBuffer.length)
+                .mapToObj(i -> encryptedDataBuffer[i])
+                .toArray(Byte[]::new);
+        byte[] encryptedText = ArrayUtils.toPrimitive(boxedEncryptedText);
+        var digest = DigestUtils.sha256(secretKey);
+        var encodedDigest = Base64.getEncoder().encode(digest);
+        var keyText = new String(encodedDigest, StandardCharsets.UTF_8).substring(0, 32);
+        var key = new SecretKeySpec(keyText.getBytes(), "AES");
+        Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
+        cipher.init(Cipher.DECRYPT_MODE, key, new IvParameterSpec(iv));
+        var plainText = cipher.doFinal(encryptedText);
+        log.info("plain text: {}", new String(plainText));
+    }
+}
